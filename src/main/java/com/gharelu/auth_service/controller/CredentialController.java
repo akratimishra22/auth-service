@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.jar.JarOutputStream;
+
 import static io.micrometer.common.util.StringUtils.isBlank;
 
 @RestController
@@ -92,16 +94,17 @@ public class CredentialController {
 
     @GetMapping("/validate-token")
     public ResponseEntity<String> validateToken(@RequestHeader("Authorization") String authHeader) {
+        System.out.println("enter validateToken auth srevice");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.badRequest().body("Missing or invalid Authorization header");
         }
-
+        System.out.println("authheader"+authHeader.substring(7));
         String token = authHeader.substring(7); // Remove "Bearer " prefix
 
         if (tokenService.validateToken(token)) {
-            return ResponseEntity.ok("Token is valid");
+            return ResponseEntity.ok("Valid");
         } else {
-            return ResponseEntity.status(401).body("Invalid or expired token");
+            return ResponseEntity.status(401).body("Invalid");
         }
     }
 
