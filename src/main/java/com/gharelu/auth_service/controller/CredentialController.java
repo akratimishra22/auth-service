@@ -2,10 +2,12 @@ package com.gharelu.auth_service.controller;
 
 import com.gharelu.auth_service.model.Credential;
 import com.gharelu.auth_service.model.CredentialView;
+import com.gharelu.auth_service.model.CustomerRequest;
 import com.gharelu.auth_service.repository.CredentialRepository;
 import com.gharelu.auth_service.service.TokenService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.jar.JarOutputStream;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import static io.micrometer.common.util.StringUtils.isBlank;
 
@@ -30,6 +32,36 @@ public class CredentialController {
     @Autowired
     private TokenService tokenService;
 
+    @Autowired
+    ApplicationContext ctx;
+
+    private Mono<Boolean> createCustomer(CredentialView credentialView) {
+        WebClient webClient = ctx.getBean("customerServiceWebClientEurekaDiscovered", WebClient.class);
+        CustomerRequest customer = CustomerRequest.builder()
+                .email(credentialView.getEmail())
+                .phoneNumber(credentialView.getPhone())
+                .firstName("firstName")
+                .lastName("lastName")
+                .build();
+
+        System.out.println("Calling customer service");
+
+        return webClient.post()
+                .bodyValue(customer)
+                .retrieve()
+                .toBodilessEntity()
+                .map(response -> {
+                    boolean success = response.getStatusCode().is2xxSuccessful();
+                    System.out.println("Customer service response: " + response.getStatusCode());
+                    return success;
+                })
+                .onErrorResume(e -> {
+                    System.out.println("Customer service failed: " + e.getMessage());
+                    return Mono.just(false);
+                });
+    }
+
+
     @PostMapping("signup")
     public ResponseEntity<String> signup(@RequestBody CredentialView credentialView) {
         Credential credential = new Credential();
@@ -38,6 +70,7 @@ public class CredentialController {
         credential.setPhone(credentialView.getPhone());
         credential.setPassword(credentialView.getPassword());
         credentialRepository.save(credential);
+        createCustomer(credentialView).block();
         return ResponseEntity.ok("Credential saved successfully!");
     }
 
